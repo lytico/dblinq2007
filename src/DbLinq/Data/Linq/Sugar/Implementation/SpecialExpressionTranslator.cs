@@ -215,7 +215,8 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
 
         protected virtual Expression TranslateConcat(List<Expression> operands)
         {
-            return Expression.Add(operands[0], operands[1]);
+            return Expression.Add(operands[0], operands[1],
+                typeof(string).GetMethod("Concat",new Type[]{typeof(string),typeof(string)}));
         }
 
         protected virtual Expression TranslateIsNotNull(List<Expression> operands)

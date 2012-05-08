@@ -76,6 +76,9 @@ namespace DbLinq.Data.Linq.Implementation
         /// </summary>
         protected readonly DataContext _dataContext;
 
+        public DataContext DataContext {
+            get { return _dataContext; }
+        }
         /// <summary>
         /// Initializes a new instance of the <see cref="QueryProvider&lt;T&gt;"/> class.
         /// </summary>

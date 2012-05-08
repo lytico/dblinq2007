@@ -60,7 +60,7 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                     builderContext.IsExternalInExpressionChain = true;
 
                 // write full debug
-#if DEBUG && !MONO_STRICT
+#if LOGEXPRESSION && !MONO_STRICT
                 var log = builderContext.QueryContext.DataContext.Log;
                 if (log != null)
                     log.WriteExpression(e);
@@ -303,6 +303,8 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                     return popCallStack(AnalyzeGenericSpecialExpressionType(SpecialExpressionType.RTrim, parameters, builderContext));
                 case "TrimStart":
                     return popCallStack(AnalyzeGenericSpecialExpressionType(SpecialExpressionType.LTrim, parameters, builderContext));
+                case "Concat":
+                    return popCallStack(AnalyzeGenericSpecialExpressionType(SpecialExpressionType.Concat, parameters, builderContext));
                 default:
                     throw Error.BadArgument("S0133: Implement QueryMethod String.{0}.", method.Name);
             }
@@ -1264,6 +1266,20 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                 if (leftTable == null)
                 {
                     var leftColumn = leftJoin as ColumnExpression;
+                    if (leftColumn == null) {
+                        var specials = new Stack<SpecialExpression>();
+                        specials.Push(leftJoin as SpecialExpression);
+                        while (specials.Count > 0 && leftColumn==null) {
+                            var special = specials.Pop();
+                            leftColumn = special.Operands.OfType<ColumnExpression>().FirstOrDefault();
+                            if (leftColumn != null) {
+                                specials.Clear();
+                                break;
+                            } 
+                            foreach (var op in special.Operands.OfType<SpecialExpression>())
+                                specials.Push(op);
+                        }
+                    }
                     if (leftColumn == null)
                         throw Error.BadArgument("S0701: No way to find left table for Join");
                     leftTable = leftColumn.Table;
@@ -1563,6 +1579,9 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                         return tableExpression;
                     }
                 }
+                var parameterExpression = RegisterParameter(constantExpression, "cParam", builderContext);
+                if (parameterExpression != null)
+                    return parameterExpression;
             }
             return expression;
         }

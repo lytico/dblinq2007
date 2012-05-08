@@ -474,6 +474,18 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                     }
                     return sqlProvider.GetSelectDistinctClause(selectClauses.ToArray());
                 }
+                var noSelect = selectExp.Tables.Count == 0;
+                if (noSelect)
+                {
+                    // maybe this is not necessary, but maybe we have to test against operand.specialtype==count
+                    var countOperand = selectExp.Operands.FirstOrDefault() as SpecialExpression;
+                    noSelect &= countOperand != null &&
+                                countOperand.SpecialNodeType == SpecialExpressionType.Count;
+                }
+                if (noSelect)
+                {
+                    return SqlStatement.Join(", ", selectClauses);
+                }
             }
             return sqlProvider.GetSelectClause(selectClauses.ToArray());
         }

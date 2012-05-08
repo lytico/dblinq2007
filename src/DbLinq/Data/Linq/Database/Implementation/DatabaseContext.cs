@@ -28,6 +28,7 @@ using System;
 using System.Data;
 using System.Data.Common;
 using System.Reflection;
+using System.Collections.Generic;
 
 namespace DbLinq.Data.Linq.Database.Implementation
 {
@@ -45,6 +46,8 @@ namespace DbLinq.Data.Linq.Database.Implementation
         }
 
         public IDbTransaction CurrentTransaction { get; set; }
+
+        public Action<IDbCommand> CommandCreated { get; set; }
 
         private readonly DbProviderFactory _providerFactory;
         /// <summary>
@@ -119,6 +122,10 @@ namespace DbLinq.Data.Linq.Database.Implementation
             IDbCommand command = Connection.CreateCommand();
             if (command.Transaction == null)
                 command.Transaction = CurrentTransaction;
+
+            if (CommandCreated != null)
+                CommandCreated(command);
+
             return command;
         }
 
@@ -175,6 +182,8 @@ namespace DbLinq.Data.Linq.Database.Implementation
             SetConnection(connection, owner);
         }
 
+
+        protected static readonly IDictionary<Type, DbProviderFactory> _dbProviderFactories = new Dictionary<Type, DbProviderFactory>();
         /// <summary>
         /// Finds a DbProviderFactory, if possible, by AppDomain scan.
         /// </summary>
@@ -182,27 +191,38 @@ namespace DbLinq.Data.Linq.Database.Implementation
         /// <returns></returns>
         protected static DbProviderFactory FindFactory(IDbConnection connection)
         {
-            // we start from connection assembly
-            var connectionAssembly = connection.GetType().Assembly;
-            // then look for all types present in assembly
-            foreach (var testType in connectionAssembly.GetExportedTypes())
+            var type = connection.GetType();
+            DbProviderFactory result = null;
+            if (_dbProviderFactories.TryGetValue(type, out result))
             {
-                if (typeof(DbProviderFactory).IsAssignableFrom(testType))
+                return result;
+            }
+            else
+            {
+                // we start from connection assembly
+                var connectionAssembly = connection.GetType().Assembly;
+                // then look for all types present in assembly
+                foreach (var testType in connectionAssembly.GetExportedTypes())
                 {
-                    var bindingFlags = BindingFlags.Static | BindingFlags.Public;
-                    FieldInfo instanceFieldInfo = testType.GetField("Instance", bindingFlags);
-                    if (instanceFieldInfo != null)
+                    if (typeof(DbProviderFactory).IsAssignableFrom(testType))
                     {
-                        return (DbProviderFactory)instanceFieldInfo.GetValue(null);
-                    }
-                    PropertyInfo instancePropertyInfo = testType.GetProperty("Instance", bindingFlags);
-                    if (instancePropertyInfo != null)
-                    {
-                        return (DbProviderFactory)instancePropertyInfo.GetGetMethod().Invoke(null, new object[0]);
+                        var bindingFlags = BindingFlags.Static | BindingFlags.Public;
+                        FieldInfo instanceFieldInfo = testType.GetField("Instance", bindingFlags);
+                        if (instanceFieldInfo != null)
+                        {
+                            result = (DbProviderFactory)instanceFieldInfo.GetValue(null);
+                        }
+                        PropertyInfo instancePropertyInfo = testType.GetProperty("Instance", bindingFlags);
+                        if (instancePropertyInfo != null)
+                        {
+                            result = (DbProviderFactory)instancePropertyInfo.GetGetMethod().Invoke(null, new object[0]);
+                        }
                     }
                 }
+                if (result != null)
+                    _dbProviderFactories[type] = result;
+                return result;
             }
-            return null;
         }
 
         public DatabaseContext(DbProviderFactory providerFactory)

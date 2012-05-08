@@ -60,7 +60,9 @@ namespace DbLinq.Data.Linq.Sugar
                 var dbParameter = command.Command.CreateParameter();
                 dbParameter.ParameterName = DataContext.Vendor.SqlProvider.GetParameterName(inputParameter.Alias);
                 object value = NormalizeDbType(inputParameter.GetValue(Target));
+
                 dbParameter.SetValue(value, inputParameter.ValueType);
+
                 command.Command.Parameters.Add(dbParameter);
             }
             return command;

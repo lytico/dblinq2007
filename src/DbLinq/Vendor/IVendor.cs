@@ -38,6 +38,7 @@ using DataContext = DbLinq.Data.Linq.DataContext;
 using Data = DbLinq.Data;
 using DbLinq.Data.Linq;
 using IExecuteResult = System.Data.Linq.IExecuteResult;
+using System;
 
 namespace DbLinq.Vendor
 {
@@ -101,5 +102,11 @@ namespace DbLinq.Vendor
         /// required by DataContext ctor, which needs to create an IDbConnection, given an IVendor
         /// </summary>
         IDbConnection CreateDbConnection(string connectionString);
+
+        /// <summary>
+        /// called after a command is created
+        /// needed to do vendorspecific settings, eg. oracle.BindByName 
+        /// </summary>
+        Action<IDbCommand> CommandCreated { get; set; }
     }
 }

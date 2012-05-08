@@ -125,5 +125,12 @@ namespace DbLinq.Oracle
             return GetLiteralSubtract(SqlStatement.Format("INSTR({0},{1})", baseString, searchString), "1");
         }
 
+        protected override SqlStatement GetLiteralExcept(SqlStatement selectA, SqlStatement selectB) {
+            return SqlStatement.Format("{0}{2}MINUS{2}{1}", selectA, selectB, NewLine);
+        }
+
+        public override SqlStatement GetLiteral(System.DateTime literal) {
+            return "'"+literal.ToString("o")+"'";
+        }
     }
 }

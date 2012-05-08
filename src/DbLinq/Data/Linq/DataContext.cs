@@ -71,8 +71,7 @@ namespace DbLinq.Data.Linq
         //              WTF?
         public DbConnection Connection { get { return DatabaseContext.Connection as DbConnection; } }
 
-        // all properties below are set public to optionally be injected
-        internal IVendor Vendor { get; set; }
+       
         internal IQueryBuilder QueryBuilder { get; set; }
         internal IQueryRunner QueryRunner { get; set; }
         internal IMemberModificationHandler MemberModificationHandler { get; set; }
@@ -295,7 +294,8 @@ namespace DbLinq.Data.Linq
             Vendor = vendor ?? 
                 (connectionString != null ? GetVendor(ref connectionString) : null) ??
                 _VendorProvider.FindVendorByProviderType(typeof(SqlClient.Sql2005Provider));
-            
+
+            databaseContext.CommandCreated = Vendor.CommandCreated;
             DatabaseContext = databaseContext;
 
             MemberModificationHandler = ObjectFactory.Create<IMemberModificationHandler>(); // not a singleton: object is stateful

@@ -61,6 +61,8 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             return
                 (from queryColumn in builderContext.EnumerateScopeColumns()
                  where queryColumn.Table.IsEqualTo(table) && queryColumn.Name == name
+                    // lytico: added: 
+                    && queryColumn.Table.Alias == table.Alias
                  select queryColumn).SingleOrDefault();
         }
 
@@ -74,7 +76,9 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
         {
             // 1. Find the table in current scope
             var foundTableExpression = (from t in builderContext.EnumerateScopeTables()
-                                        where t.IsEqualTo(tableExpression)
+                                        where t.IsEqualTo(tableExpression) &&
+                                        // lytico: added 
+                                        t.Alias == tableExpression.Alias
                                         select t).SingleOrDefault();
             if (foundTableExpression != null)
                 return foundTableExpression;

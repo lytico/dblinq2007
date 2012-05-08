@@ -27,7 +27,7 @@
 using System;
 using System.Diagnostics;
 using System.Linq.Expressions;
-
+using System.Data.Linq.Mapping;
 using DbLinq.Data.Linq.Sugar.Expressions;
 
 namespace DbLinq.Data.Linq.Sugar.Expressions
@@ -40,9 +40,11 @@ namespace DbLinq.Data.Linq.Sugar.Expressions
     {
         public const ExpressionType ExpressionType = (ExpressionType)CustomExpressionType.ObjectInputParameter;
 
+        public MetaDataMember MetaDataMember { get; private set; }
         public string Alias { get; private set; }
         public Type ValueType { get; private set; }
 
+        
         private readonly Delegate getValueDelegate;
         /// <summary>
         /// Returns the outer parameter value
@@ -53,13 +55,14 @@ namespace DbLinq.Data.Linq.Sugar.Expressions
             return getValueDelegate.DynamicInvoke(o);
         }
 
-        public ObjectInputParameterExpression(LambdaExpression lambda, Type valueType, string alias)
+        public ObjectInputParameterExpression(LambdaExpression lambda, Type valueType, MetaDataMember metaDataMember)
             : base(ExpressionType, lambda.Type)
         {
             if (lambda.Parameters.Count != 1)
                 throw Error.BadArgument("S0055: Lambda must take 1 argument");
             getValueDelegate = lambda.Compile();
-            Alias = alias;
+            this.MetaDataMember = metaDataMember;
+            Alias = metaDataMember.Name;
             ValueType = valueType;
         }
     }

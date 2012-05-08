@@ -80,5 +80,9 @@ namespace DbLinq.Data.Linq
         {
             return _ExecuteMethodCall(context, method, sqlParams);
         }
+
+        // all properties below are set public to optionally be injected
+        public IVendor Vendor { get; internal set; }
+
     }
 }

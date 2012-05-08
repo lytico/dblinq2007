@@ -90,8 +90,16 @@ namespace DbLinq.Data.Linq.Mapping
 
 			foreach (AssociationData data in associationFixupList)
 			{
-				var metaAssociation = new AttributedMetaAssociation(data.Member, data.Association, data.DataMember);
-				data.DataMember.SetAssociation(metaAssociation);
+                AttributedMetaAssociation metaAssociation = null;
+                try {
+                    metaAssociation = new AttributedMetaAssociation(data.Member, data.Association, data.DataMember);
+                    data.DataMember.SetAssociation(metaAssociation);
+                } catch(Exception ex) {
+                    throw new InvalidOperationException(
+                        string.Format("Error on Association {0} {1} {2}", data.Member.Name, data.Association.Name,
+                                      data.DataMember.Name), ex);
+                }
+			    
                 yield return metaAssociation;
 			}
         }

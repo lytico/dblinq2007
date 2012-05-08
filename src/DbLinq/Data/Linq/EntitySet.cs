@@ -353,7 +353,7 @@ namespace DbLinq.Data.Linq
         /// </returns>
         bool ICollection<TEntity>.IsReadOnly
         {
-            get { throw new NotImplementedException(); }
+            get { return false; }
         }
 
         /// <summary>

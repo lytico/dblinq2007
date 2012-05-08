@@ -73,6 +73,8 @@ namespace DbLinq.Data.Linq.Database
         /// <returns></returns>
         IDisposable OpenConnection();
 
+        Action<IDbCommand> CommandCreated { get; set; }
+
         // factory
         /// <summary>
         /// Creates a command.
@@ -84,5 +86,7 @@ namespace DbLinq.Data.Linq.Database
         /// </summary>
         /// <returns></returns>
         IDbDataAdapter CreateDataAdapter();
+
+        
     }
 }

@@ -155,7 +155,7 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                 var getter = (Expression<Func<object, object>>)(o => memberInfo.GetMemberValue(o));
                 var inputParameter = new ObjectInputParameterExpression(
                     getter,
-                    memberInfo.GetMemberType(), dataMember.Name);
+                    memberInfo.GetMemberType(), dataMember);
                 if (dataMember.IsPrimaryKey && (! dataMember.IsDbGenerated))
                 {
                     upsertParameters.PKColumns.Add(column);
@@ -329,7 +329,7 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                 var getter = (Expression<Func<object, object>>)(o => memberInfo.GetMemberValue(o));
                 var inputParameter = new ObjectInputParameterExpression(
                     getter,
-                    memberInfo.GetMemberType(), pkMember.Name);
+                    memberInfo.GetMemberType(), pkMember);
                 var column = sqlProvider.GetColumn(pkMember.MappedName);
                 pkColumns.Add(column);
                 pkValues.Add(sqlProvider.GetParameterName(inputParameter.Alias));

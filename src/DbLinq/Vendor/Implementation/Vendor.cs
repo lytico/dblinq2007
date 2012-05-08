@@ -40,6 +40,7 @@ using Data = DbLinq.Data;
 
 using IExecuteResult = System.Data.Linq.IExecuteResult;
 using System.Text;
+using DbLinq.Util;
 
 namespace DbLinq.Vendor.Implementation
 {
@@ -218,5 +219,7 @@ namespace DbLinq.Vendor.Implementation
                     "connectionString");
             return (IDbConnection)Activator.CreateInstance(connType, connectionString);
         }
+
+        public virtual Action<IDbCommand> CommandCreated { get; set; }
     }
 }

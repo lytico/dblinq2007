@@ -115,11 +115,13 @@ namespace DbLinq.Vendor.Implementation
         /// <param name="inputPKColumns">PK columns for reference</param>
         /// <param name="inputPKValues">PK values for reference</param>
         /// <returns></returns>
-        public SqlStatement GetUpdate(SqlStatement table, IList<SqlStatement> inputColumns,
+        public SqlStatement GetUpdate(SqlStatement table, 
+            IList<SqlStatement> inputColumns,
             IList<SqlStatement> inputValues,
             IList<SqlStatement> outputParameters, IList<SqlStatement> outputExpressions,
             IList<SqlStatement> inputPKColumns, IList<SqlStatement> inputPKValues)
         {
+           
             if (inputColumns.Count == 0)
                 return SqlStatement.Empty;
 

@@ -35,6 +35,8 @@ using DbLinq.Data.Linq.Sugar.ExpressionMutator;
 using DbLinq.Data.Linq.Sugar.Expressions;
 using DbLinq.Factory;
 using DbLinq.Util;
+using System.Text;
+
 
 namespace DbLinq.Data.Linq.Sugar.Implementation
 {
@@ -70,15 +72,19 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
         /// <param name="expressions"></param>
         /// <param name="queryContext"></param>
         /// <returns></returns>
-        protected virtual ExpressionQuery BuildExpressionQuery(ExpressionChain expressions, QueryContext queryContext)
+        protected virtual BuilderContext BuildExpressionQuery(ExpressionChain expressions, QueryContext queryContext, bool compile)
         {
             var builderContext = new BuilderContext(queryContext);
-            BuildExpressionQuery(expressions, builderContext);
+            BuildExpressionQuery(expressions, builderContext, compile);
             CheckTablesAlias(builderContext);
             CheckParametersAlias(builderContext);
-            return builderContext.ExpressionQuery;
+            return builderContext;
         }
 
+        protected virtual ExpressionQuery BuildExpressionQuery(ExpressionChain expressions, QueryContext queryContext)
+        {
+            return BuildExpressionQuery(expressions, queryContext, true).ExpressionQuery;
+        }
         /// <summary>
         /// Finds all registered tables or columns with the given name.
         /// We exclude parameter because they won't be prefixed/suffixed the same way (well, that's a guess, I hope it's a good one)
@@ -176,7 +182,7 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
         /// </summary>
         /// <param name="expressions"></param>
         /// <param name="builderContext"></param>
-        protected virtual void BuildExpressionQuery(ExpressionChain expressions, BuilderContext builderContext)
+        protected virtual void BuildExpressionQuery(ExpressionChain expressions, BuilderContext builderContext, bool compile)
         {
             var previousExpression = ExpressionDispatcher.CreateTableExpression(expressions.Expressions[0], builderContext);
             previousExpression = BuildExpressionQuery(expressions, previousExpression, builderContext);
@@ -185,8 +191,11 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             PrepareSqlOperands(builderContext);
             // now, we optimize anything we can
             OptimizeQuery(builderContext);
-            // finally, compile our object creation method
-            CompileRowCreator(builderContext);
+            if (compile)
+            {
+                // finally, compile our object creation method
+                CompileRowCreator(builderContext);
+            }
             // in the very end, we keep the SELECT clause
             builderContext.ExpressionQuery.Select = builderContext.CurrentSelect;
         }
@@ -356,10 +365,13 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             return cache.GetFromSelectCache(expressions);
         }
 
-        protected virtual void SetInSelectCache(ExpressionChain expressions, SelectQuery sqlSelectQuery)
+        protected virtual void SetInSelectCache(ExpressionChain expressions, SelectQuery query)
         {
             var cache = QueryCache;
-            cache.SetInSelectCache(expressions, sqlSelectQuery);
+            // Lytico: dont cache the dataContext. It is a short living object and should not be cached! 
+            query = new SelectQuery(null, query.Sql, query.InputParameters, query.RowObjectCreator,
+                         query.ExecuteMethodName);
+            cache.SetInSelectCache(expressions, query);
         }
 
         protected virtual Delegate GetFromTableReaderCache(Type tableType, IList<string> columns)
@@ -374,53 +386,62 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             cache.SetInTableReaderCache(tableType, columns, tableReader);
         }
 
-        /// <summary>
-        /// Main entry point for the class. Builds or retrive from cache a SQL query corresponding to given Expressions
-        /// </summary>
-        /// <param name="expressions"></param>
-        /// <param name="queryContext"></param>
-        /// <returns></returns>
+
+        private readonly IThreadSafeDictionary<string, Delegate> selectRowCreators = new ThreadSafeDictionary<string, Delegate>();
+
         public SelectQuery GetSelectQuery(ExpressionChain expressions, QueryContext queryContext)
         {
-            SelectQuery query = null;
+
+            Profiler.At("START: GetSelectQuery(), building Expression query");
+            var builderContext = BuildExpressionQuery(
+                expressions,
+                queryContext,
+                !queryContext.DataContext.QueryCacheEnabled);
+
+            Profiler.At("END: GetSelectQuery(), building Expression query");
+
+            Profiler.At("START: GetSelectQuery(), building Sql query");
+            var sql = SqlBuilder.BuildSelect(builderContext.ExpressionQuery, queryContext);
+            Profiler.At("END: GetSelectQuery(), building Sql query");
+
+            // we cache the sql 
+            var cb = new StringBuilder(sql.ToString());
+            foreach (var e in expressions)
+                cb.Append(e);
+
+            var cacheKey = cb.ToString();
+
+            // correct, but very time consuming:
+            // AND the reader, cause it is possible to have same sql and different reader-parameters
+            //= string.Concat(sql,builderContext.ExpressionQuery.Select.Reader);
+
             if (queryContext.DataContext.QueryCacheEnabled)
             {
-                query = GetFromSelectCache(expressions);
-            }
-            if (query == null)
-            {
-                Profiler.At("START: GetSelectQuery(), building Expression query");
-                var expressionsQuery = BuildExpressionQuery(expressions, queryContext);
-                Profiler.At("END: GetSelectQuery(), building Expression query");
+                Delegate rowObjectCreator = null;
 
-                Profiler.At("START: GetSelectQuery(), building Sql query");
-                query = BuildSqlQuery(expressionsQuery, queryContext);
-                Profiler.At("END: GetSelectQuery(), building Sql query");
-
-                if (queryContext.DataContext.QueryCacheEnabled)
+                if (selectRowCreators.TryGetValue(cacheKey, out rowObjectCreator))
                 {
-                    SetInSelectCache(expressions, query);
+                    builderContext.ExpressionQuery.RowObjectCreator = rowObjectCreator;
                 }
             }
-            else if (query.InputParameters.Count > 0)
-            {
-                Profiler.At("START: GetSelectQuery(), building Expression parameters of cached query");
-                var parameters = BuildExpressionParameters(expressions, queryContext);
-                query = new SelectQuery(queryContext.DataContext, query.Sql, parameters, query.RowObjectCreator, query.ExecuteMethodName);
-                Profiler.At("END: GetSelectQuery(), building Expression parameters of cached query");
-            }
-            return query;
-        }
 
-        IList<InputParameterExpression> BuildExpressionParameters(ExpressionChain expressions, QueryContext queryContext)
-        {
-            var builderContext = new BuilderContext(queryContext);
-            var previousExpression = ExpressionDispatcher.CreateTableExpression(expressions.Expressions[0], builderContext);
-            previousExpression = BuildExpressionQuery(expressions, previousExpression, builderContext);
-            BuildOffsetsAndLimits(builderContext);
-            // then prepare Parts for SQL translation
-            PrepareSqlOperands(builderContext);
-            return builderContext.ExpressionQuery.Parameters;
+            if (builderContext.ExpressionQuery.RowObjectCreator == null)
+            {
+                // finally, compile our object creation method; this is the Time-Expensive stuff
+                CompileRowCreator(builderContext);
+                if (queryContext.DataContext.QueryCacheEnabled)
+                {
+                    selectRowCreators.MergeSafe(cacheKey, builderContext.ExpressionQuery.RowObjectCreator);
+                }
+            }
+            var query = new SelectQuery(
+                queryContext.DataContext,
+                sql,
+                builderContext.ExpressionQuery.Parameters,
+                builderContext.ExpressionQuery.RowObjectCreator,
+                builderContext.ExpressionQuery.Select.ExecuteMethodName);
+
+            return query;
         }
 
         /// <summary>

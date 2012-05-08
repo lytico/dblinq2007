@@ -40,10 +40,11 @@ namespace DbLinq.Util
         {
             if (dataRecord.IsDBNull(index))
                 return null;
-            object o = dataRecord.GetValue(index);
-            if (o == null) // this is not supposed to happen
-                return null;
-            return o.ToString();
+            //object o = dataRecord.GetValue(index);
+            //if (o == null) // this is not supposed to happen
+            //    return null;
+            //return o.ToString();
+            return dataRecord.GetString(index);
         }
 
         public static bool GetAsBool(this IDataRecord dataRecord, int index)
