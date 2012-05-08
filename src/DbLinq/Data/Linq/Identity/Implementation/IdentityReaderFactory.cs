@@ -27,6 +27,7 @@
 using System;
 using DbLinq.Data.Linq.Identity;
 using DbLinq.Data.Linq.Identity.Implementation;
+using DbLinq.Util;
 
 #if MONO_STRICT
 using System.Data.Linq;
@@ -50,7 +51,7 @@ namespace DbLinq.Data.Linq.Identity.Implementation
         /// <returns></returns>
         public IIdentityReader GetReader(Type t, DataContext dataContext)
         {
-            if (typeof(IIdentityProvider).IsAssignableFrom(t))
+            if (t.Implements<IIdentityProvider>())
                 return new IdentityProviderReader();
             return new IdentityReader(t, dataContext);
         }

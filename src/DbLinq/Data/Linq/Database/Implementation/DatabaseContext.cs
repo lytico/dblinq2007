@@ -28,6 +28,7 @@ using System;
 using System.Data;
 using System.Data.Common;
 using System.Reflection;
+using DbLinq.Util;
 
 namespace DbLinq.Data.Linq.Database.Implementation
 {
@@ -187,7 +188,7 @@ namespace DbLinq.Data.Linq.Database.Implementation
             // then look for all types present in assembly
             foreach (var testType in connectionAssembly.GetExportedTypes())
             {
-                if (typeof(DbProviderFactory).IsAssignableFrom(testType))
+                if (testType.Implements<DbProviderFactory>())
                 {
                     var bindingFlags = BindingFlags.Static | BindingFlags.Public;
                     FieldInfo instanceFieldInfo = testType.GetField("Instance", bindingFlags);

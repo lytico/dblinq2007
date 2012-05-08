@@ -58,7 +58,7 @@ namespace DbLinq.Util
         [Conditional("DEBUG")]
         public static void At(string format, params object[] args)
         {
-            if (profiling)
+            if (false && profiling)
             {
                 Timer.Stop();
                 Log.Write("#AT(time={0:D12}, elapsed={1:D12}) ", Timer.ElapsedTicks, Timer.ElapsedTicks - prevTicks);

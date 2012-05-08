@@ -38,7 +38,9 @@ namespace DbLinq.Data.Linq.Sugar.ExpressionMutator.Implementation
         public Expression Mutate(IList<Expression> operands)
         {
             if (NewExpression.Members != null)
+            {
                 return Expression.New(NewExpression.Constructor, operands, NewExpression.Members);
+            }
             return Expression.New(NewExpression.Constructor, operands);
         }
 

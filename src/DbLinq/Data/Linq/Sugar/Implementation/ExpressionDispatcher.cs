@@ -37,6 +37,9 @@ using DbLinq.Data.Linq.Sugar.ExpressionMutator;
 using DbLinq.Data.Linq.Sugar.Expressions;
 using DbLinq.Data.Linq.Sugar.Implementation;
 using DbLinq.Factory;
+using DbLinq.Util;
+using System.Collections;
+using System.Data.Linq.Mapping;
 
 
 namespace DbLinq.Data.Linq.Sugar.Implementation
@@ -94,16 +97,20 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             // if we have a GroupByExpression, the result type is not the same:
             // - we need to read what is going to be the Key expression
             // - the final row generator builds a IGrouping<K,T> instead of T
+            if (selectExpression is TableExpression)
+            {
+                //Expression group;
+                selectExpression = GetTableGroup(selectExpression, builderContext) ?? selectExpression;
+            }
             var selectGroupExpression = selectExpression as GroupExpression;
             if (selectGroupExpression != null)
             {
-                lambdaSelectExpression = CutOutOperands(selectGroupExpression.GroupedExpression, builderContext);
-                var lambdaSelectKeyExpression = CutOutOperands(selectGroupExpression.KeyExpression, builderContext);
-                lambdaSelectExpression = BuildSelectGroup(lambdaSelectExpression, lambdaSelectKeyExpression,
-                                                          builderContext);
+                //Removing group from the currentSQl (actually, if the group is the last clause, there's no group by clause on the sql
+                builderContext.CurrentSelect.Group.Remove(selectGroupExpression);
+                lambdaSelectExpression = GetGroupReader(selectGroupExpression, builderContext);
             }
             else
-                lambdaSelectExpression = CutOutOperands(selectExpression, builderContext);
+                lambdaSelectExpression = CutOutOperands(selectExpression, builderContext, true);
             // look for tables and use columns instead
             // (this is done after cut, because the part that went to SQL must not be converted)
             //selectExpression = selectExpression.Recurse(e => CheckTableExpression(e, builderContext));
@@ -111,9 +118,52 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             builderContext.CurrentSelect.Reader = lambdaSelectExpression;
         }
 
+        private static Expression GetTableGroup(Expression selectExpression, BuilderContext builderContext)
+        {
+            Expression group;
+            group = builderContext.CurrentSelect.Group.LastOrDefault(w => w.GroupedExpression.Equals(selectExpression));
+            if (group != null)
+                selectExpression = group;
+            return group;
+        }
+
+        private LambdaExpression GetGroupReader(GroupExpression selectGroupExpression, BuilderContext builderContext)
+        {
+            var dataRecordParameter = Expression.Parameter(typeof(IDataRecord), "dataRecord");
+            var mappingContextParameter = Expression.Parameter(typeof(MappingContext), "mappingContext");
+            return GetGroupReader(selectGroupExpression, builderContext, dataRecordParameter, mappingContextParameter);
+        }
+
+        private LambdaExpression GetGroupReader(GroupExpression selectGroupExpression, BuilderContext builderContext,
+                    ParameterExpression dataRecordParameter, ParameterExpression mappingContextParameter)
+        {
+            LambdaExpression lambdaSelectExpression, lambdaSelectKeyExpression;
+            GetGroupLambdaSelecs(selectGroupExpression, builderContext, out lambdaSelectExpression, out lambdaSelectKeyExpression);
+            lambdaSelectExpression = BuildSelectGroup(lambdaSelectExpression, lambdaSelectKeyExpression,
+                                                      builderContext);
+            return lambdaSelectExpression;
+        }
+
+
+        private void GetGroupLambdaSelecs(GroupExpression group, BuilderContext context,
+            out LambdaExpression lambdaSelect, out LambdaExpression lambdaKeySelect)
+        {
+            lambdaSelect = CutOutOperands(group.GroupedExpression, context);
+            lambdaKeySelect = CutOutOperands(group.KeyExpression, context);
+        }
+        public InvocationExpression getJustIGrouping(GroupExpression selectGroupExpression, BuilderContext builderContext,
+                    ParameterExpression dataRecordParameter, ParameterExpression mappingContextParameter)
+        {
+            LambdaExpression lambdaSelectExpression;
+            lambdaSelectExpression = CutOutOperands(selectGroupExpression.GroupedExpression, builderContext);
+            var lambdaSelectKeyExpression = CutOutOperands(selectGroupExpression.KeyExpression, builderContext);
+            var Lambda = Expression.Lambda(GetIGrouping(lambdaSelectExpression, lambdaSelectKeyExpression, dataRecordParameter, mappingContextParameter),
+                dataRecordParameter, mappingContextParameter);
+            return Expression.Invoke(Lambda, dataRecordParameter, mappingContextParameter);
+        }
         /// <summary>
         /// Builds the lambda as:
-        /// (dr, mc) => new LineGrouping<K,T>(selectKey(dr,mc),select(dr,mc))
+        /// (dr, mc) => new ListGroup<K,T>(selectKey(dr,mc),select(dr,mc))
         /// </summary>
         /// <param name="select"></param>
         /// <param name="selectKey"></param>
@@ -124,17 +174,55 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
         {
             var dataRecordParameter = Expression.Parameter(typeof(IDataRecord), "dataRecord");
             var mappingContextParameter = Expression.Parameter(typeof(MappingContext), "mappingContext");
-            var kType = selectKey.Body.Type;
+            return BuildSelectGroup(select, selectKey, builderContext, dataRecordParameter, mappingContextParameter);
+        }
+
+        protected virtual LambdaExpression BuildSelectGroup(LambdaExpression select, LambdaExpression selectKey,
+                                                            BuilderContext builderContext,
+                                                            ParameterExpression dataRecordParameter,
+                                                            ParameterExpression mappingContextParameter)
+        {
+            UnaryExpression newIGrouping = GetIGrouping(select, selectKey, dataRecordParameter, mappingContextParameter);
+            var t0 = typeof(IEnumerable<>).MakeGenericType(
+                //(newIGrouping.Operand as NewExpression).Arguments[0].Type,
+                (newIGrouping.Operand as NewExpression).Arguments[1].Type);
+            var t = typeof(IFindAndProcess);
+            var p = Expression.Parameter(t, "p");
+            //var lambda = Expression.Lambda(newIGrouping, dataRecordParameter, mappingContextParameter, p);
+            ParameterExpression pReg = Expression.Parameter(typeof(object), "re");
+            var addNew = getGroupingOp(dataRecordParameter, mappingContextParameter, pReg, new List<Expression>() { selectKey, select });
+            ParameterExpression pList = Expression.Parameter(t, "re");
+            MethodInfo met = t.GetMethod("FindAndProcess");
+            Expression Validation = Expression.Call(pList, met,
+                                                    Expression.Lambda(addNew[0], pReg),
+                                                    Expression.Lambda(addNew[1], pReg));
+            Validation = Expression.Invoke(Expression.Lambda(Validation, pList), pList);
+            var cond = Expression.Condition(Validation, newIGrouping, Expression.Convert(Expression.Constant(null), newIGrouping.Type));
+            var ret = Expression.Lambda(cond, dataRecordParameter, mappingContextParameter, pList);
+            return ret;
+        }
+
+        private static UnaryExpression GetIGrouping(LambdaExpression select, LambdaExpression selectKey, ParameterExpression dataRecordParameter, ParameterExpression mappingContextParameter)
+        {
             var lType = select.Body.Type;
-            var groupingType = typeof(LineGrouping<,>).MakeGenericType(kType, lType);
-            var groupingCtor = groupingType.GetConstructor(new[] { kType, lType });
-            var invokeSelectKey = Expression.Invoke(selectKey, dataRecordParameter, mappingContextParameter);
+            Type groupingType;
+            ConstructorInfo groupingCtor;
             var invokeSelect = Expression.Invoke(select, dataRecordParameter, mappingContextParameter);
-            var newLineGrouping = Expression.New(groupingCtor, invokeSelectKey, invokeSelect);
-            var iGroupingType = typeof(IGrouping<,>).MakeGenericType(kType, lType);
-            var newIGrouping = Expression.Convert(newLineGrouping, iGroupingType);
-            var lambda = Expression.Lambda(newIGrouping, dataRecordParameter, mappingContextParameter);
-            return lambda;
+            Expression newLineGrouping;
+            var kType = selectKey.Body.Type;
+            groupingType = typeof(ListGroup<,>).MakeGenericType(kType, lType);
+            groupingCtor = groupingType.GetConstructor(new[] { kType, lType });
+            var invokeSelectKey = Expression.Invoke(selectKey, dataRecordParameter, mappingContextParameter);
+            newLineGrouping = Expression.New(groupingCtor, invokeSelectKey, invokeSelect);
+            //return Expression.Convert(newLineGrouping, typeof(IEnumerable<>).MakeGenericType(lType));
+            return Expression.Convert(newLineGrouping, typeof(IGrouping<,>).MakeGenericType(kType,lType));
+        }
+
+        private static UnaryExpression GetGroupList(GroupExpression group, BuilderContext builderContext,
+                                    ParameterExpression dataRecordParameter, ParameterExpression mappingContextParameter)
+        {
+            var t = typeof(ListGroup<,>);
+            return null;
         }
 
         /// <summary>
@@ -145,13 +233,140 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
         /// </summary>
         /// <param name="selectExpression"></param>
         /// <param name="builderContext"></param>
-        protected virtual LambdaExpression CutOutOperands(Expression selectExpression, BuilderContext builderContext)
+        protected virtual LambdaExpression CutOutOperands(Expression selectExpression, BuilderContext builderContext, bool parentCall = false)
         {
             var dataRecordParameter = Expression.Parameter(typeof(IDataRecord), "dataRecord");
             var mappingContextParameter = Expression.Parameter(typeof(MappingContext), "mappingContext");
             var expression = CutOutOperands(selectExpression, dataRecordParameter, mappingContextParameter, builderContext);
-            return Expression.Lambda(expression, dataRecordParameter, mappingContextParameter);
+            //ParentCall is the first call of this method, the call that effectively will have, at this point
+            //the final type of the resultset.
+            if (parentCall)
+            {
+                var t = typeof(ListResult<>).MakeGenericType(expression.Type);
+                ParameterExpression pList = Expression.Parameter(t, "re");
+                var nex = expression as NewExpression;
+                if (nex != null)
+                {
+                    List<Expression> addNew = null;
+                    MethodInfo met = t.GetMethod("FindAndProcess");
+                    ParameterExpression pReg = Expression.Parameter(typeof(object), "re");
+                    for(int i = 0; i < nex.Members.Count; i++)
+                    {
+                        var m = nex.Members[i];
+                        var ma = Expression.MakeMemberAccess(Expression.Convert(pReg, nex.Type), m);
+                        if (m.GetMemberType().Implements<IEnumerable>())
+                        {
+                            List<Expression> newIt;
+                            try
+                            {
+                                newIt = nex.Arguments[i].GetEntityType();
+                            }
+                            catch { continue; }
+                            RemoveGroupOf((newIt[1] as LambdaExpression).Body.Type, builderContext);
+                            addNew = getGroupingOp(dataRecordParameter, mappingContextParameter, ma, newIt, addNew);
+                        }
+                        
+                    }
+                    if (addNew != null)
+                    {
+                        Expression Validation = Expression.Call(pList, met,
+                                                    Expression.Lambda(addNew[0], pReg),
+                                                    Expression.Lambda(addNew[1], pReg));
+                        Validation = Expression.Invoke(Expression.Lambda(Validation, pList), pList);
+                        expression = Expression.Condition(Validation, expression, Expression.Convert(Expression.Constant(null), expression.Type));
+                    }
+                }
+                return Expression.Lambda(expression, dataRecordParameter, mappingContextParameter, pList);
+            }
+            return expression == null? null : Expression.Lambda(expression, dataRecordParameter, mappingContextParameter);
         }
+
+        private void RemoveGroupOf(Type expression, BuilderContext builderContext)
+        {
+            GroupExpression groupRem = null;
+            foreach (var group in builderContext.CurrentSelect.Group)
+            {
+                if (group.Type == expression)
+                    groupRem = group;
+            }
+            if (groupRem != null)
+                builderContext.CurrentSelect.Group.Remove(groupRem);
+        }
+
+        private static List<Expression> getGroupingOp(ParameterExpression dataRecordParameter, ParameterExpression mappingContextParameter,
+                    Expression ma, List<Expression> newIt, List<Expression> addNew = null)
+        {
+
+            if (addNew == null)
+                addNew = new List<Expression>();
+            while (addNew.Count < 2)
+                addNew.Add(null);
+            var t2 = typeof(ListGroup<,>).MakeGenericType((newIt[0] as LambdaExpression).Body.Type, (newIt[1] as LambdaExpression).Body.Type);
+            MethodInfo add = t2.GetMethod("ExpAdd");
+            MemberInfo mem = t2.GetSingleMember("Key");
+            var cex = Expression.Convert(ma, t2);
+            MemberExpression mex = Expression.MakeMemberAccess(cex, mem);
+            var comp = GetComparacao(mex, newIt[0], dataRecordParameter, mappingContextParameter);
+            var v = Expression.Call(cex, add, Expression.Invoke(newIt[1], dataRecordParameter, mappingContextParameter));
+            if (addNew[0] == null)
+            {
+                addNew[0] = comp;
+                addNew[1] = v;
+            }
+            else
+            {
+                addNew[0] = Expression.And(addNew[0], comp);
+                addNew[1] = Expression.Or(addNew[1], v);
+            }
+            return addNew;
+        }
+
+
+        public static Expression GetComparacao(Expression original, Expression newValue0, ParameterExpression dataRecordParameter, ParameterExpression mappingContextParameter)
+        {
+            Expression exp = null;
+            //If the expression is a table
+            LambdaExpression newValue = newValue0 as LambdaExpression;
+            var atb = original.Type.GetAttribute<TableAttribute>();
+            if (atb != null)
+            {
+                exp = null;
+                var Columns = original.Type.GetProperties().Where(p => p.GetAttribute<ColumnAttribute>() != null).ToList();
+                for (int i = 0; i < Columns.Count; i++)
+                {
+                    var primary = Columns[i];
+                    if (primary.IsPrimary())
+                    {
+                        var vex = newValue.GetBindvalue(i);
+                        var eq = GetComparacao(Expression.MakeMemberAccess(original, primary), vex, dataRecordParameter, mappingContextParameter);
+                        if (exp == null)
+                            exp = eq;
+                        else
+                            exp = Expression.And(exp, eq);
+                    }
+                }
+            }
+            else if (newValue.Body is NewExpression)
+            {
+                exp = null;
+                var nex = newValue.Body as NewExpression;
+                foreach (var m in nex.Members)
+                {
+                    var lex = Expression.Lambda(Expression.MakeMemberAccess(nex, m), newValue.Parameters.ToArray());
+                   var eq = GetComparacao(Expression.MakeMemberAccess(original, m), lex, dataRecordParameter, mappingContextParameter);
+                    if (exp == null)
+                        exp = eq;
+                    else
+                        exp = Expression.And(exp, eq);
+                }
+            }
+            else
+            {
+                exp = Expression.Equal(original, Expression.Invoke(newValue, dataRecordParameter, mappingContextParameter));
+            }
+            return exp;
+        }
+
 
         /// <summary>
         /// Cuts tiers in CLR / SQL.
@@ -174,8 +389,10 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                 // in this case, we convert it into its declared columns
                 if (expression is TableExpression)
                 {
+                    //if the table was grouped, then it's a implicity group expression, with the into clause
                     return GetOutputTableReader((TableExpression)expression, dataRecordParameter,
                                                 mappingContextParameter, builderContext);
+             
                 }
                 // for EntitySets, we have a special EntitySet builder
                 if (expression is EntitySetExpression)
@@ -189,15 +406,66 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             }
             // or we dig down
             var operands = new List<Expression>();
+            Dictionary<int, Expression> groupers = new Dictionary<int, Expression>();
+            Dictionary<int, Expression> groupeds = new Dictionary<int, Expression>();
+            bool isgroup;
+            GroupExpression group;
+            //Defining if there's a group
+            int i = 0;
             foreach (var operand in expression.GetOperands())
             {
-                operands.Add(operand == null 
-                    ? null
-                    : CutOutOperands(operand, dataRecordParameter, mappingContextParameter, builderContext));
+                if (isGroupedField(operand, builderContext, out group))
+                    groupeds.Add(i, group);
+                else
+                    groupers.Add(i, operand);
+                i++;
+            }
+            if (groupeds.Count > 0)
+            {
+                foreach(var k in groupeds.Keys.ToArray())
+                {
+                 //   groupeds[k] = new GroupExpression((groupeds[k] as GroupExpression).GroupedExpression, groupers.Values.First());
+                    //I turned the setter accessible to do this
+                    //for while, just one group, until I learn how to do with many
+                    //(g as GroupExpression).KeyExpression = groupers.Values.First();
+                }
+            }
+            var e = groupers.Union(groupeds).OrderBy(kv => kv.Key);
+            foreach (var kv in e)
+            {
+                var operand = kv.Value;
+                if (operand == null)
+                    operands.Add(null);
+                else
+                {
+                    Expression newOp;
+                    if (operand is GroupExpression)
+                        newOp = getJustIGrouping(operand as GroupExpression, builderContext, dataRecordParameter, mappingContextParameter);
+                    else
+                        newOp = CutOutOperands(operand, dataRecordParameter, mappingContextParameter, builderContext);
+                    operands.Add(newOp);
+                }
             }
             return expression.ChangeOperands(operands);
         }
 
+        private bool isGroupedField(Expression expression, BuilderContext builderContext, out GroupExpression group)
+        {
+            if (expression.Type.Implements<IEnumerable>())
+            {
+                GroupExpression exp = null;
+                try
+                {
+                    var t = expression.Type.GetGenericArguments().First();
+                    exp = builderContext.CurrentSelect.Group.LastOrDefault(g => g.Type.Equals(t));
+                }
+                catch { }
+                group = exp;
+                return (exp != null);
+            }
+            group = null;
+            return false;
+        }
         /// <summary>
         /// Returns true if we must cut out the given Expression
         /// </summary>

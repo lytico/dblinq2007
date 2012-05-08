@@ -160,5 +160,7 @@ namespace DbLinq.Util
                 return null;
             return GetAsGuid(dataRecord, index);
         }
+
+
     }
 }

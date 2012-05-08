@@ -86,6 +86,7 @@ WHERE t.constraint_name = c.constraint_name
             public string TableSchema;
             public string TableName;
             public string ColumnName;
+            public string ConstraintType;
 
             public override string ToString()
             {
@@ -101,19 +102,21 @@ WHERE t.constraint_name = c.constraint_name
             t.TableSchema = rdr.GetAsString(field++);
             t.TableName = rdr.GetAsString(field++);
             t.ColumnName = rdr.GetAsString(field++);
+            t.ConstraintType = rdr.GetAsString(field++);
             return t;
         }
 
         protected virtual List<DataConstraint> ReadConstraints(IDbConnection conn, string db)
         {
-            string sql = @"
-SELECT constraint_name,table_schema,table_name
-    ,column_name
-FROM information_schema.KEY_COLUMN_USAGE
-WHERE constraint_catalog=:db";
+            string sql = @"SELECT a.constraint_name,a.table_schema,a.table_name
+    ,a.column_name, t.constraint_type
+FROM information_schema.KEY_COLUMN_USAGE a
+     INNER JOIN information_schema.table_constraints t
+     ON a.constraint_name = t.constraint_name
+WHERE a.constraint_catalog=:db AND
+    t.constraint_type IN  ('FOREIGN KEY','PRIMARY KEY')";
 
             return DataCommand.Find<DataConstraint>(conn, sql, ":db", db, ReadConstraint);
         }
-
     }
 }

@@ -28,6 +28,7 @@ using System;
 using System.Linq.Expressions;
 using DbLinq.Data.Linq.Sugar.ExpressionMutator.Implementation;
 using DbLinq.Data.Linq.Sugar.Expressions;
+using System.Collections.Generic;
 
 namespace DbLinq.Data.Linq.Sugar.ExpressionMutator
 {
@@ -48,7 +49,9 @@ namespace DbLinq.Data.Linq.Sugar.ExpressionMutator
             if (expression is MemberExpression)
                 return new MemberExpressionMutator((MemberExpression)expression);
             if (expression is MethodCallExpression)
+            {
                 return new MethodCallExpressionMutator((MethodCallExpression)expression);
+            }
             if (expression is NewExpression)
                 return new NewExpressionMutator((NewExpression)expression);
             if (expression is NewArrayExpression)
@@ -63,6 +66,8 @@ namespace DbLinq.Data.Linq.Sugar.ExpressionMutator
                 return new TypeBinaryExpressionMutator((TypeBinaryExpression)expression);
             if (expression is UnaryExpression)
                 return new UnaryExpressionMutator((UnaryExpression)expression);
+            if (expression == null)
+                return null;
             throw Error.BadArgument("S0064: Unknown Expression Type '{0}'", expression.GetType());
         }
     }

@@ -192,6 +192,8 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
         /// <returns></returns>
         public ExpressionTier GetTier(Expression expression)
         {
+            if (expression == null)
+                return ExpressionTier.Clr;
             if (expression is GroupExpression)
                 return ExpressionTier.Clr;
             if (expression is SelectExpression)

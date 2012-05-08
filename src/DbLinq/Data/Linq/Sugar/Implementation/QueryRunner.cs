@@ -34,6 +34,7 @@ using DbLinq.Data.Linq.Database;
 using DbLinq.Data.Linq.Sql;
 using DbLinq.Data.Linq.Sugar.Expressions;
 using DbLinq.Util;
+using System.Linq;
 
 #if MONO_STRICT
 using System.Data.Linq;
@@ -51,14 +52,15 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
         /// <returns></returns>
         public virtual IEnumerable<T> Select<T>(SelectQuery selectQuery)
         {
-            var rowObjectCreator = selectQuery.GetRowObjectCreator<T>();
 
-            IList<T> results = new List<T>();
+            var rowObjectCreator = selectQuery.GetRowObjectCreator<T>();
+            
+            ListResult<T> results = new ListResult<T>();
 
             // handle the special case where the query is empty, meaning we don't need the DB
             if (string.IsNullOrEmpty(selectQuery.Sql.ToString()))
             {
-                results.Add(rowObjectCreator(null, null));
+                results.Add(rowObjectCreator(null, null,null));
             }
             else
             {
@@ -75,16 +77,20 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                             if (reader.FieldCount == 0)
                                 continue;
 
-                            var row = rowObjectCreator(reader, selectQuery.DataContext._MappingContext);
+                            var row = rowObjectCreator(reader, selectQuery.DataContext._MappingContext, results);
+                            
                             // the conditions to register and watch an entity are:
                             // - not null (can this happen?)
                             // - registered in the model
-                            if (row != null && selectQuery.DataContext.ObjectTrackingEnabled && 
-                                    selectQuery.DataContext.Mapping.GetTable(row.GetType()) != null)
+                            if (row != null)
                             {
-                                row = (T)selectQuery.DataContext.Register(row);
+                                if (selectQuery.DataContext.ObjectTrackingEnabled &&
+                                        selectQuery.DataContext.Mapping.GetTable(row.GetType()) != null)
+                                {
+                                    row = (T)selectQuery.DataContext.Register(row);
+                                }
+                                results.Add(row);
                             }
-                            results.Add(row);
                         }
                     }
                 }
@@ -242,7 +248,8 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                             throw new InvalidOperationException("Could not retrieve data for inserted row on " + target.GetType());
 
                         int outputParameterIndex = 0;
-                        for (IEnumerator<ObjectOutputParameterExpression> output = insertQuery.OutputParameters.GetEnumerator(); output.MoveNext(); ++outputParameterIndex)
+                        for (IEnumerator<ObjectOutputParameterExpression> output = 
+                            insertQuery.OutputParameters.GetEnumerator(); output.MoveNext(); ++outputParameterIndex)
                         {
                             var outputDbParameter = dataReader.GetValue(outputParameterIndex);
                             SetOutputParameterValue(target, output.Current, outputDbParameter);

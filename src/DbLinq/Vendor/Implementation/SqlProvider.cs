@@ -306,6 +306,8 @@ namespace DbLinq.Vendor.Implementation
                 return GetLiteralSubtract(p[0], p[1]);
             case ExpressionType.SubtractChecked:
                 return GetLiteralSubtractChecked(p[0], p[1]);
+            case ExpressionType.New:
+                return GetColumns();
             //case ExpressionType.TypeAs:
             //    break;
             //case ExpressionType.TypeIs:
@@ -1599,6 +1601,8 @@ namespace DbLinq.Vendor.Implementation
         /// </returns>
         protected virtual bool IsMadeSafe(string namePart)
         {
+            if (namePart == "*")
+                return true;
             var l = namePart.Length;
             if (l < 2)
                 return false;

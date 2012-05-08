@@ -40,6 +40,7 @@ namespace DbLinq.Util
         /// <param name="expression"></param>
         public static void WriteExpression(this TextWriter textWriter, Expression expression)
         {
+            return;
             try
             {
                 var rawLines = new List<string>(Write(expression, string.Empty, 0));

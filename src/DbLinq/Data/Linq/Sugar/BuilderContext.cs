@@ -217,5 +217,7 @@ namespace DbLinq.Data.Linq.Sugar
         }
 
         public bool IsExternalInExpressionChain { get; set; }
+
+        public bool GroupJoin { get; set; }
     }
 }

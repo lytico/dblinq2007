@@ -192,7 +192,7 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             return RegisterColumn(tableExpression, memberInfo, dataMember.MappedName, builderContext);
         }
 
-        public ColumnExpression CreateColumn(TableExpression table, MemberInfo memberInfo, BuilderContext builderContext)
+        public static ColumnExpression CreateColumn(TableExpression table, MemberInfo memberInfo, BuilderContext builderContext)
         {
             var dataMember = builderContext.QueryContext.DataContext.Mapping.GetTable(table.Type).RowType
                 .GetDataMember(memberInfo);
@@ -386,6 +386,7 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                                                           ParameterExpression dataRecordParameter, ParameterExpression mappingContextParameter,
                                                           BuilderContext builderContext)
         {
+
             var bindings = new List<MemberBinding>();
             
             foreach (ColumnExpression columnExpression in RegisterAllColumns(tableExpression, builderContext))
@@ -400,7 +401,8 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                     bindings.Add(binding);
                 }
             }
-            var newExpression = Expression.New(tableExpression.Type);
+            var t = tableExpression.Type;
+            var newExpression = Expression.New(t);
             var initExpression = Expression.MemberInit(newExpression, bindings);
             return initExpression;
         }

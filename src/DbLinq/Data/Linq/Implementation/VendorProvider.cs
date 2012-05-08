@@ -59,7 +59,7 @@ namespace DbLinq.Data.Linq.Implementation
                         foreach (var type in assembly.GetTypes())
                         {
                             // ... then look for an IVendor implementation ...
-                            if (typeof(IVendor).IsAssignableFrom(type))
+                            if (type.Implements<IVendor>())
                             {
                                 // then see if the attribute matches the request
                                 var vendorAttribute = type.GetAttribute<VendorAttribute>();

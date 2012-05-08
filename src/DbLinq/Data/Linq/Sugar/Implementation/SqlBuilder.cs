@@ -35,6 +35,9 @@ using DbLinq.Data.Linq.Sugar.Expressions;
 
 using DbLinq.Factory;
 using DbLinq.Util;
+using DbLinq.Data.Linq.Sugar.ExpressionMutator.Implementation;
+using System.Text;
+using System.Collections;
 
 namespace DbLinq.Data.Linq.Sugar.Implementation
 {
@@ -118,10 +121,20 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             }
 
             // TODO: the following might be wrong (at least this might be the wrong place to do this
-            if (select.ToString() == string.Empty)
-                select = new SqlStatement("SELECT " + sqlProvider.GetLiteral(null) + " AS " + sqlProvider.GetSafeName("Empty"));
-
+            //if (select.ToString() == string.Empty)
+            //    select = new SqlStatement("SELECT " + sqlProvider.GetLiteral(null) + " AS " + sqlProvider.GetSafeName("Empty"));
             var tables = GetSortedTables(selectExpression);
+            if (select.ToString() == string.Empty)
+            {
+                StringBuilder b = new StringBuilder("SELECT ");
+                string comma = "";
+                foreach (ColumnExpression col in selectExpression.Columns)
+                {
+                    b.Append(comma).Append(col.Table.Alias).Append("$.").Append(col.Name).Append(" AS ").Append(col.Alias);
+                    comma = ",";
+                }
+                select = b.ToString();
+            }
             var from = BuildFrom(tables, queryContext);
             var join = BuildJoin(tables, queryContext);
             var where = BuildWhere(tables, selectExpression.Where, queryContext);
@@ -129,6 +142,7 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             var having = BuildHaving(selectExpression.Where, queryContext);
             var orderBy = BuildOrderBy(selectExpression.OrderBy, queryContext);
             select = Join(queryContext, select, from, join, where, groupBy, having, orderBy);
+            //select = Join(queryContext, select, from, join, where, having, orderBy);
             select = BuildLimit(selectExpression, select, queryContext);
 
             if (selectExpression.NextSelectExpression != null)
@@ -160,15 +174,24 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             var sqlProvider = queryContext.DataContext.Vendor.SqlProvider;
             var currentPrecedence = ExpressionQualifier.GetPrecedence(expression);
             // first convert operands
+            if (expression is MethodCallExpression)
+            {
+                MethodCallExpression mex = (MethodCallExpression)expression;
+                if (mex.Method.Name.Equals("Equals")
+                        && mex.Arguments.Count == 1){
+                    expression = BinaryExpression.Equal(mex.Object, mex.Arguments[0]);
+                }
+            }
             var operands = expression.GetOperands();
             var literalOperands = new List<SqlStatement>();
             foreach (var operand in operands)
             {
                 var operandPrecedence = ExpressionQualifier.GetPrecedence(operand);
                 var literalOperand = BuildExpression(operand, queryContext);
-                if (operandPrecedence > currentPrecedence)
-                    literalOperand = sqlProvider.GetParenthesis(literalOperand);
-                literalOperands.Add(literalOperand);
+                    if (operandPrecedence > currentPrecedence)
+                        literalOperand = sqlProvider.GetParenthesis(literalOperand);
+                    if (literalOperand != null)
+                        literalOperands.Add(literalOperand);
             }
 
             // then converts expression
@@ -203,7 +226,7 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                 {
                     int i = 0;
                     List<SqlStatement> inputParameters = new List<SqlStatement>();
-                    foreach (object p in (Array)inputParameterExpression.GetValue())
+                    foreach (object p in (IEnumerable)inputParameterExpression.GetValue())
                     {
                         inputParameters.Add(new SqlStatement(new SqlParameterPart(sqlProvider.GetParameterName(inputParameterExpression.Alias + i.ToString()),
                                                           inputParameterExpression.Alias + i.ToString())));
@@ -241,6 +264,8 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                     return sqlProvider.GetLiteralConvert(firstOperand, unaryExpression.Type);
                 return firstOperand;
             }
+            if (expression.NodeType == ExpressionType.Parameter)
+                return sqlProvider.GetLiteral(expression);
             return sqlProvider.GetLiteral(expression.NodeType, literalOperands);
         }
 

@@ -534,7 +534,7 @@ namespace DbMetal.Generator
                         function.Parameters.Select(p => (CodeExpression) new CodeVariableReferenceExpression(p.Name)));
             method.Statements.Add(
                     new CodeVariableDeclarationStatement(
-                        new CodeTypeReference("IExecuteResult"),
+                        new CodeTypeReference("System.Data.Linq.IExecuteResult"),
                         "result",
                         new CodeMethodInvokeExpression(
                             new CodeMethodReferenceExpression(thisReference, "ExecuteMethodCall"),

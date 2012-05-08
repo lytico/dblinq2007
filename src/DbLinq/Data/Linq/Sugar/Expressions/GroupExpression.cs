@@ -27,8 +27,10 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq.Expressions;
+using DbLinq.Util;
 
 using DbLinq.Data.Linq.Sugar.ExpressionMutator;
+using DbLinq.Data.Linq.Sugar.Implementation;
 
 namespace DbLinq.Data.Linq.Sugar.Expressions
 {
@@ -45,25 +47,36 @@ namespace DbLinq.Data.Linq.Sugar.Expressions
         public const ExpressionType ExpressionType = (ExpressionType)CustomExpressionType.Group;
 
         public Expression GroupedExpression { get; private set; }
-        public Expression KeyExpression { get; private set; }
+        public Expression KeyExpression { get; set; }
 
         public IList<Expression> Clauses { get; private set; }
 
-        public GroupExpression(Expression groupedExpression, Expression keyExpression)
+        internal GroupExpression(Expression groupedExpression, Expression keyExpression, BuilderContext builderContext)
             : base(ExpressionType, groupedExpression.Type)
         {
             GroupedExpression = groupedExpression;
             KeyExpression = keyExpression;
             Clauses = new List<Expression>();
             // extract columns (for SQL build)
-            keyExpression.Recurse(
-                delegate(Expression e)
+            if (keyExpression != null)
+            {
+                keyExpression.Recurse(
+                    delegate(Expression e)
                     {
                         if (e is ColumnExpression)
                             Clauses.Add(e);
+                        if (e is TableExpression)
+                            foreach (var primary in (e as TableExpression).GetColumns())
+                            {
+                                if (primary.IsPrimary())
+                                {
+                                    Clauses.Add(ExpressionDispatcher.CreateColumn(e as TableExpression, primary, builderContext));
+                                }
+                            }
                         return e;
                     }
-                );
+                    );
+            }
         }
 
         public override Expression Mutate(IList<Expression> newOperands)

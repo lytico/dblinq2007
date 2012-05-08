@@ -137,5 +137,20 @@ namespace DbLinq.Util
                 return name.Split('`')[0];
             return name;
         }
+
+        public static bool ImplementsAny(this Type t, params Type[] ts)
+        {
+            return t.GetInterfaces().Intersect(ts).Any();
+        }
+
+        public static bool Implements<T>(this Type t)
+        {
+            return Implements(t, typeof(T));
+        }
+
+        public static bool Implements(this Type t, Type type)
+        {
+            return type.IsAssignableFrom(t);
+        }
     }
 }

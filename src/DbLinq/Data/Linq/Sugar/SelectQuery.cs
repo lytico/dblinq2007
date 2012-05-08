@@ -38,6 +38,8 @@ using DbLinq.Data.Linq;
 using DbLinq.Data.Linq.Mapping;
 using DbLinq.Data.Linq.Sql;
 using DbLinq.Data.Linq.Sugar.Expressions;
+using DbLinq.Data.Linq.Sugar.Implementation;
+using System.Collections;
 
 namespace DbLinq.Data.Linq.Sugar
 {
@@ -63,9 +65,9 @@ namespace DbLinq.Data.Linq.Sugar
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public Func<IDataRecord, MappingContext, T> GetRowObjectCreator<T>()
+        public Func<IDataRecord, MappingContext, ListResult<T>, T> GetRowObjectCreator<T>()
         {
-            return (Func<IDataRecord, MappingContext, T>)RowObjectCreator;
+            return (Func<IDataRecord, MappingContext, ListResult<T>, T>)RowObjectCreator;
         }
 
         /// <summary>
