@@ -94,6 +94,12 @@ namespace DbLinq.Data.Linq
             set { queryCacheEnabled = value; }
         }
 
+#if !MONO_STRICT
+        public IVendor Vendor {get; internal set;}
+#else
+        internal IVendor Vendor {get;  set;}
+#endif
+
         private IEntityTracker currentTransactionEntities;
         private IEntityTracker CurrentTransactionEntities
         {

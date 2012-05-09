@@ -137,15 +137,23 @@ namespace DbMetal.Generator.Implementation
             bool error = false;
             foreach (var association in table.Type.Associations)
             {
-                var otherType           = database.Tables.Single(t => t.Type.Name == association.Type).Type;
-                var otherAssociation    = otherType.Associations.Single(a => a.Type == table.Type.Name && a.ThisKey == association.OtherKey);
-                var otherColumn         = otherType.Columns.Single(c => c.Member == association.OtherKey);
+                try {
+                    var otherType = database.Tables.Single(t => t.Type.Name == association.Type).Type;
+                    var otherAssociation =
+                        otherType.Associations.Single(
+                            a => a.Type == table.Type.Name && a.ThisKey == association.OtherKey);
+                    var otherColumn = otherType.Columns.Single(c => c.Name == association.OtherKey);
 
-                if (association.CardinalitySpecified && association.Cardinality == Cardinality.Many && association.IsForeignKey)
-                {
-                    error = true;
-                    Log.WriteErrorLine("Error DBML1059: The IsForeignKey attribute of the Association element '{0}' of the Type element '{1}' cannnot be '{2}' when the Cardinality attribute is '{3}'.",
+                    if (association.CardinalitySpecified && association.Cardinality == Cardinality.Many &&
+                        association.IsForeignKey) {
+                        error = true;
+                        Log.WriteErrorLine(
+                            "Error DBML1059: The IsForeignKey attribute of the Association element '{0}' of the Type element '{1}' cannnot be '{2}' when the Cardinality attribute is '{3}'.",
                             association.Name, table.Type.Name, association.IsForeignKey, association.Cardinality);
+                    }
+                } catch(Exception ex) {
+                    //error = true;
+                    Log.WriteErrorLine("Error in Assosiation {0}", association.Name);
                 }
             }
             return error;
@@ -238,6 +246,7 @@ namespace DbMetal.Generator.Implementation
         public Database ReadSchema(Parameters parameters, out ISchemaLoader schemaLoader)
         {
             Database dbSchema;
+           
             var nameAliases = NameAliasesLoader.Load(parameters.Aliases);
             if (parameters.SchemaXmlFile == null) // read schema from DB
             {
