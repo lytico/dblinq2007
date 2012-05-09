@@ -274,7 +274,10 @@ namespace DbMetal.Generator
                 TypeAttributes  = TypeAttributes.Public 
             };
 
-            _class.BaseTypes.Add(GetContextBaseType(database.BaseType));
+            var contextBaseType = string.IsNullOrEmpty(database.BaseType)
+                ? "DataContext"
+                : TypeLoader.Load(database.BaseType).Name;
+            _class.BaseTypes.Add(contextBaseType);
 
             var onCreated = CreatePartialMethod("OnCreated");
             onCreated.StartDirectives.Add(new CodeRegionDirective(CodeRegionMode.Start, "Extensibility Method Declarations"));
@@ -305,20 +308,6 @@ namespace DbMetal.Generator
             }
 
             return _class;
-        }
-
-        static string GetContextBaseType(string type)
-        {
-            string baseType = "DataContext";
-
-            if (!string.IsNullOrEmpty(type))
-            {
-                var t = TypeLoader.Load(type);
-                if (t != null)
-                    baseType = t.Name;
-            }
-
-            return baseType;
         }
 
         void GenerateContextConstructors(CodeTypeDeclaration contextType, Database database)
@@ -1260,7 +1249,7 @@ namespace DbMetal.Generator
         {
             return association.Storage != null 
                 ? GetStorageFieldName(association.Storage) 
-                : "_" + CreateIdentifier(association.Member ?? association.Name);
+                : "_" + CreateIdentifier(association.Member);
         }
 
         static string CreateIdentifier(string value)

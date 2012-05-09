@@ -72,6 +72,11 @@ namespace DbLinq.Firebird
             return string.Format("UPPER({0})", a);
         }
 
+        protected override SqlStatement GetLiteralSubString(SqlStatement baseString, SqlStatement startIndex) 
+        {
+            return SqlStatement.Format("SUBSTRING({0}, {1})", baseString, startIndex);
+        }
+
         protected override char SafeNameStartQuote { get { return ' '; } }
         protected override char SafeNameEndQuote { get { return ' '; } }
 

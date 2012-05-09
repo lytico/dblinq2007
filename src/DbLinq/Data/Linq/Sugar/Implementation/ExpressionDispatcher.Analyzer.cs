@@ -1579,9 +1579,6 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                         return tableExpression;
                     }
                 }
-                var parameterExpression = RegisterParameter(constantExpression, "cParam", builderContext);
-                if (parameterExpression != null)
-                    return parameterExpression;
             }
             return expression;
         }

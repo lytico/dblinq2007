@@ -130,7 +130,7 @@ namespace DbLinq.Oracle
         }
 
         public override SqlStatement GetLiteral(System.DateTime literal) {
-            return "'"+literal.ToString("o")+"'";
+            return string.Format("to_date( \'{0}\',\'yyyy-mm-dd hh24:mi:ss\')", literal.ToString("yyyy-MM-dd HH:mm:ss"));
         }
     }
 }
