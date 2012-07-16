@@ -1169,18 +1169,20 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                 // ms-help://MS.VSCC.v90/MS.MSDNQTR.v90.en/fxref_system.core/html/3371348f-7811-b0bc-8c0a-2a595e08e086.htm
                 var tableExpression = parameters[0];
                 var projectionExpression = Analyze(parameters[1], new[] { tableExpression }, builderContext);
-                //var manyPiece = Analyze(parameters[2], new[] { tableExpression, projectionExpression }, builderContext);
-                // from here, our manyPiece is a MetaTable definition
-                //var newExpression = manyPiece as NewExpression;
-                //if (newExpression == null)
-                //    throw Error.BadArgument("S0377: Expected a NewExpression as SelectMany() return value");
-                //Type metaTableType;
-                //var associations = GetTypeInitializers<TableExpression>(newExpression, true, out metaTableType);
-                //return RegisterMetaTable(metaTableType, associations, builderContext);
+              
                 var metaTableDefinitionBuilderContext = builderContext.Clone();
                 metaTableDefinitionBuilderContext.ExpectMetaTableDefinition = true;
                 var expression = Analyze(parameters[2], new[] { tableExpression, projectionExpression },
                                          metaTableDefinitionBuilderContext);
+
+                if (false) {
+                    var newExpression = expression as NewExpression;
+                    if (newExpression != null) {
+                        Type metaTableType;
+                        var associations = GetTypeInitializers<MutableExpression>(newExpression, true, out metaTableType);
+                        return RegisterMetaTable(metaTableType, associations, builderContext);
+                    }
+                }
                 return expression;
             }
             throw Error.BadArgument("S0358: Don't know how to handle this SelectMany() overload ({0} parameters)", parameters.Count);
@@ -1249,41 +1251,64 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             return expression;
         }
 
+        TableExpression FindTable(Expression expression) {
+            var column = expression as ColumnExpression;
+            if (column == null) {
+                var expressions = new Stack<Expression>();
+                expressions.Push(expression);
+                while (expressions.Count > 0 && column == null) {
+                    var exp = expressions.Pop();
+                    column = exp as ColumnExpression;
+                    if (column != null) {
+                        expressions.Clear();
+                        break;
+                    }
+
+                    if (exp is SpecialExpression) {
+                        foreach (var op in ((SpecialExpression)exp).Operands.Reverse())
+                            expressions.Push(op);
+                    } else if (exp is UnaryExpression) {
+                        expressions.Push(((UnaryExpression)exp).Operand);
+                    } else if (exp is LambdaExpression) {
+                        expressions.Push(((LambdaExpression)exp).Body);
+                    } else if (exp is BinaryExpression) {
+                        expressions.Push(((BinaryExpression)exp).Left);
+                        expressions.Push(((BinaryExpression)exp).Right);
+                    } else {
+                        break;
+                    }
+                }
+            }
+        
+            if (column == null)
+                return null;
+            return column.Table;
+        }
+
         private Expression AnalyzeJoin(IList<Expression> parameters, TableJoinType joinType, BuilderContext builderContext)
         {
             if (parameters.Count == 5)
             {
                 var leftExpression = Analyze(parameters[0], builderContext);
-                var rightTable = Analyze(parameters[1], builderContext) as TableExpression;
-                if (rightTable == null)
-                    throw Error.BadArgument("S0536: Expected a TableExpression for Join");
+                var rightExpression = Analyze(parameters[1], builderContext);
+
                 var leftJoin = Analyze(parameters[2], leftExpression, builderContext);
-                var rightJoin = Analyze(parameters[3], rightTable, builderContext);
-                // from here, we have two options to join:
-                // 1. left and right are tables, we can use generic expressions (most common)
-                // 2. left is something else (a meta table)
-                var leftTable = leftExpression as TableExpression;
+                var rightJoin = Analyze(parameters[3], rightExpression, builderContext);
+
+                var rightTable =
+                     rightExpression as TableExpression ??
+                     FindTable(rightJoin);    
+             
+                if (rightTable == null)
+                    throw Error.BadArgument("S0536: No way to find right table for Join");
+
+                var leftTable =                             // from here, we have two options to join:
+                    leftExpression as TableExpression ??    // 1. left and right are tables, we can use generic expressions (most common)
+                    FindTable(leftJoin);                    // 2. left is something else (a meta table)
+
                 if (leftTable == null)
-                {
-                    var leftColumn = leftJoin as ColumnExpression;
-                    if (leftColumn == null) {
-                        var specials = new Stack<SpecialExpression>();
-                        specials.Push(leftJoin as SpecialExpression);
-                        while (specials.Count > 0 && leftColumn==null) {
-                            var special = specials.Pop();
-                            leftColumn = special.Operands.OfType<ColumnExpression>().FirstOrDefault();
-                            if (leftColumn != null) {
-                                specials.Clear();
-                                break;
-                            } 
-                            foreach (var op in special.Operands.OfType<SpecialExpression>())
-                                specials.Push(op);
-                        }
-                    }
-                    if (leftColumn == null)
-                        throw Error.BadArgument("S0701: No way to find left table for Join");
-                    leftTable = leftColumn.Table;
-                }
+                    throw Error.BadArgument("S0701: No way to find left table for Join");
+
                 rightTable.Join(joinType, leftTable, Expression.Equal(leftJoin, rightJoin),
                                 string.Format("join{0}", builderContext.EnumerateAllTables().Count()));
                 // last part is lambda, with two tables as parameters

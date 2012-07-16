@@ -126,11 +126,21 @@ namespace DbLinq.Oracle
         }
 
         protected override SqlStatement GetLiteralExcept(SqlStatement selectA, SqlStatement selectB) {
-            return SqlStatement.Format("{0}{2}MINUS{2}{1}", selectA, selectB, NewLine);
+            return SqlStatement.Format("{0}{2} MINUS {2}{1}", selectA, selectB, NewLine);
         }
 
         public override SqlStatement GetLiteral(System.DateTime literal) {
             return string.Format("to_date( \'{0}\',\'yyyy-mm-dd hh24:mi:ss\')", literal.ToString("yyyy-MM-dd HH:mm:ss"));
+        }
+
+        protected override SqlStatement GetLiteralDateDiff(SqlStatement dateA, SqlStatement dateB) {
+            return SqlStatement.Format("({0}-{1})", dateA, dateB);
+        }
+
+        public override SqlStatement GetLiteral(Data.Linq.Sugar.Expressions.SpecialExpressionType operationType, IList<SqlStatement> p) {
+            if (operationType == Data.Linq.Sugar.Expressions.SpecialExpressionType.Date)
+                return string.Format("trunc({0})", p[0]); //  Cast(p[0] as date) gives back datetime again, not date!
+            return base.GetLiteral(operationType, p);
         }
     }
 }

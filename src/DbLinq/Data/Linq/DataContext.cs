@@ -69,7 +69,7 @@ namespace DbLinq.Data.Linq
         public MetaModel Mapping { get; private set; }
         // PC question: at ctor, we get a IDbConnection and the Connection property exposes a DbConnection
         //              WTF?
-        public DbConnection Connection { get { return DatabaseContext.Connection as DbConnection; } }
+        public IDbConnection Connection { get { return DatabaseContext.Connection as DbConnection; } }
 
        
         internal IQueryBuilder QueryBuilder { get; set; }
@@ -340,6 +340,10 @@ namespace DbLinq.Data.Linq
         /// <typeparam name="TEntity">The table type.</typeparam>
         public Table<TEntity> GetTable<TEntity>() where TEntity : class
         {
+            return (Table<TEntity>)GetTable(typeof(TEntity));
+        }
+
+        public IQueryable<TEntity> GetQuery<TEntity>() where TEntity : class {
             return (Table<TEntity>)GetTable(typeof(TEntity));
         }
 
@@ -1030,8 +1034,8 @@ namespace DbLinq.Data.Linq
 			set { throw new NotImplementedException(); }
 		}
 
-        public DbTransaction Transaction {
-            get { return (DbTransaction) DatabaseContext.CurrentTransaction; }
+        public IDbTransaction Transaction {
+            get { return DatabaseContext.CurrentTransaction; }
             set { DatabaseContext.CurrentTransaction = value; }
         }
 

@@ -58,7 +58,8 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             // handle the special case where the query is empty, meaning we don't need the DB
             if (string.IsNullOrEmpty(selectQuery.Sql.ToString()))
             {
-                results.Add(rowObjectCreator(null, null));
+                //results.Add(rowObjectCreator(null, null));
+                yield return rowObjectCreator(null, null);
             }
             else
             {
@@ -84,12 +85,13 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                             {
                                 row = (T)selectQuery.DataContext.Register(row);
                             }
-                            results.Add(row);
+                            //results.Add(row);
+                            yield return row;
                         }
                     }
                 }
             }
-            return results;
+            //return results;
         }
 
         /// <summary>
