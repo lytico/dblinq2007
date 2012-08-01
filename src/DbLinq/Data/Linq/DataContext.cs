@@ -338,12 +338,13 @@ namespace DbLinq.Data.Linq
         /// </summary>
         /// <exception cref="InvalidOperationException">If the type TEntity is not mappable as a Table.</exception>
         /// <typeparam name="TEntity">The table type.</typeparam>
-        public Table<TEntity> GetTable<TEntity>() where TEntity : class
+        public virtual Table<TEntity> GetTable<TEntity>() where TEntity : class
         {
             return (Table<TEntity>)GetTable(typeof(TEntity));
         }
 
-        public IQueryable<TEntity> GetQuery<TEntity>() where TEntity : class {
+        public virtual IQueryable<TEntity> GetQuery<TEntity>() where TEntity : class 
+        {
             return (Table<TEntity>)GetTable(typeof(TEntity));
         }
 
@@ -988,7 +989,7 @@ namespace DbLinq.Data.Linq
         /// <summary>
         /// use ExecuteCommand to call raw SQL
         /// </summary>
-        public int ExecuteCommand(string command, params object[] parameters)
+        public object ExecuteCommand(string command, params object[] parameters)
         {
             var directQuery = QueryBuilder.GetDirectQuery(command, new QueryContext(this));
             return QueryRunner.Execute(directQuery, parameters);

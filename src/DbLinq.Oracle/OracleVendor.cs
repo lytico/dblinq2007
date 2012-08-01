@@ -54,7 +54,7 @@ namespace DbLinq.Oracle
 
         public override bool Ping(DataContext dataContext)
         {
-            return dataContext.ExecuteCommand("SELECT 11 FROM DUAL") == 11;
+            return (int)dataContext.ExecuteCommand("SELECT 11 FROM DUAL") == 11;
         }
 
         public override IExecuteResult ExecuteMethodCall(DataContext context, MethodInfo method

@@ -318,7 +318,7 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
         /// <param name="directQuery"></param>
         /// <param name="parameters"></param>
         /// <returns></returns>
-        public int Execute(DirectQuery directQuery, params object[] parameters)
+        public object Execute(DirectQuery directQuery, params object[] parameters)
         {
             directQuery.parameterValues = parameters;
             using (var dbCommand = directQuery.GetCommand())
@@ -328,10 +328,12 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                 directQuery.DataContext.WriteLog(dbCommand.Command);
 
                 var result = dbCommand.Command.ExecuteScalar();
+                return result;
+
                 if (result == null || result is DBNull)
                     return 0;
-                var intResult = TypeConvert.ToNumber<int>(result);
-                return intResult;
+                //var intResult = TypeConvert.ToNumber<int>(result);
+                //return intResult;
             }
         }
 

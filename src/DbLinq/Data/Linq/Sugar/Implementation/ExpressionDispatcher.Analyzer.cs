@@ -1295,7 +1295,7 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                 var leftJoin = Analyze(parameters[2], leftExpression, builderContext);
                 var rightJoin = Analyze(parameters[3], rightExpression, builderContext);
 
-                var rightTable =
+                var  rightTable =
                      rightExpression as TableExpression ??
                      FindTable(rightJoin);    
              
@@ -1309,13 +1309,16 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                 if (leftTable == null)
                     throw Error.BadArgument("S0701: No way to find left table for Join");
 
+                if (rightTable.JoinedTable != null)
+                    throw Error.BadArgument("S0702: Unable to join Table {0} with {1}; there is already a Join with {2}", rightTable.Name, leftTable.Name, rightTable.JoinedTable.Name);
+
                 rightTable.Join(joinType, leftTable, Expression.Equal(leftJoin, rightJoin),
-                                string.Format("join{0}", builderContext.EnumerateAllTables().Count()));
-                // last part is lambda, with two tables as parameters
+                        string.Format("join{0}", builderContext.EnumerateAllTables().Count()));
                 var metaTableDefinitionBuilderContext = builderContext.Clone();
                 metaTableDefinitionBuilderContext.ExpectMetaTableDefinition = true;
-                var expression = Analyze(parameters[4], new[] { leftExpression, rightTable }, metaTableDefinitionBuilderContext);
+                var expression = Analyze(parameters[4], new[] { leftExpression, rightExpression }, metaTableDefinitionBuilderContext);
                 return expression;
+
             }
             throw Error.BadArgument("S0530: Don't know how to handle GroupJoin() with {0} parameters", parameters.Count);
         }

@@ -61,7 +61,7 @@ namespace DbLinq.Vendor.Implementation
         /// <returns></returns>
         public virtual bool Ping(DataContext dataContext)
         {
-            return dataContext.ExecuteCommand("SELECT 11") == 11;
+            return (int) dataContext.ExecuteCommand("SELECT 11") == 11;
         }
 
         /// <summary>

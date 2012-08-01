@@ -86,7 +86,7 @@ namespace DbLinq.Data.Linq.Sugar
         /// <param name="directQuery"></param>
         /// <param name="parameters"></param>
         /// <returns></returns>
-        int Execute(DirectQuery directQuery, params object[] parameters);
+        object Execute(DirectQuery directQuery, params object[] parameters);
 
         /// <summary>
         /// Runs a query with a direct statement
