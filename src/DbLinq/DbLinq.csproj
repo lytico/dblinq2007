@@ -225,6 +225,7 @@
     <Compile Include="Data\Linq\Sugar\Implementation\ExpressionOptimizer.cs" />
     <Compile Include="Data\Linq\Sugar\Implementation\ExpressionQualifier.cs" />
     <Compile Include="Data\Linq\Sugar\Implementation\QueryBuilder.Upsert.cs" />
+    <Compile Include="Data\Linq\Sugar\Implementation\QueryCache.cs" />
     <Compile Include="Data\Linq\Sugar\ParameterizedQuery.cs">
       <SubType>Code</SubType>
     </Compile>

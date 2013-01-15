@@ -34,6 +34,7 @@ using DbLinq.Data.Linq.Database;
 using DbLinq.Data.Linq.Sql;
 using DbLinq.Data.Linq.Sugar.Expressions;
 using DbLinq.Util;
+using System.Text;
 
 #if MONO_STRICT
 using System.Data.Linq;
@@ -58,7 +59,6 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
             // handle the special case where the query is empty, meaning we don't need the DB
             if (string.IsNullOrEmpty(selectQuery.Sql.ToString()))
             {
-                //results.Add(rowObjectCreator(null, null));
                 yield return rowObjectCreator(null, null);
             }
             else
@@ -75,18 +75,37 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                             // someone told me one day this could happen (in SQLite)
                             if (reader.FieldCount == 0)
                                 continue;
+                            T row = default(T);
+                            try
+                            {
+                                row = rowObjectCreator(reader, selectQuery.DataContext._MappingContext);
+                            }
+                            catch (Exception ex)
+                            {
+                                var rowValues = new StringBuilder();
+                                for (int i = 0; i < reader.FieldCount; i++)
+                                    rowValues.Append(reader.GetName(i) + "t");
+                                rowValues.AppendLine();
+                                for (int i = 0; i < reader.FieldCount; i++)
+                                    rowValues.Append(reader[i].ToString() + "t");
+                                rowValues.AppendLine();
 
-                            var row = rowObjectCreator(reader, selectQuery.DataContext._MappingContext);
+                                selectQuery.DataContext.WriteLog(rowValues.ToString()+ ex.Message + ex.StackTrace);
+                                
+                                if (!selectQuery.DataContext.SupressErrorInReader)
+                                    throw ex;
+                            }
                             // the conditions to register and watch an entity are:
                             // - not null (can this happen?)
                             // - registered in the model
-                            if (row != null && selectQuery.DataContext.ObjectTrackingEnabled && 
-                                    selectQuery.DataContext.Mapping.GetTable(row.GetType()) != null)
+                            if (row != null && selectQuery.DataContext.ObjectTrackingEnabled &&
+                                selectQuery.DataContext.Mapping.GetTable(row.GetType()) != null)
                             {
-                                row = (T)selectQuery.DataContext.Register(row);
+                                row = (T) selectQuery.DataContext.Register(row);
                             }
-                            //results.Add(row);
+
                             yield return row;
+
                         }
                     }
                 }

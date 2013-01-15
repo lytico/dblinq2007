@@ -40,6 +40,7 @@ using System.Text;
 
 namespace DbLinq.Data.Linq.Sugar.Implementation
 {
+   
     /// <summary>
     /// Full query builder, with cache management
     /// 1. Parses Linq Expression

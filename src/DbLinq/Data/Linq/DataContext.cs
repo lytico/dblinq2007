@@ -94,6 +94,13 @@ namespace DbLinq.Data.Linq
             set { queryCacheEnabled = value; }
         }
 
+        [DBLinqExtended]
+        public bool SupressErrorInReader
+        {
+            get;
+            set;
+        }
+
 #if !MONO_STRICT
         public IVendor Vendor {get; internal set;}
 #else
