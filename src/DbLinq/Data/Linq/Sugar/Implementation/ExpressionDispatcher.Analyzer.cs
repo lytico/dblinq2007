@@ -1545,7 +1545,9 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
                         newContext.CurrentSelect.Tables.Add(c.Table);
                     }
                     // TODO: verify if this is the right place to work
-                    return new SpecialExpression(SpecialExpressionType.In, p0, newContext.CurrentSelect.Mutate(new Expression[] { p1 }));
+                    var newCurrent = (SelectExpression) newContext.CurrentSelect.Mutate(new Expression[] { p1 });
+                    newContext.CurrentSelect = newCurrent;
+                    return new SpecialExpression(SpecialExpressionType.In, p0, newCurrent);
                 }
             }
             throw Error.BadArgument("S0548: Can't analyze Contains() method");

@@ -1463,6 +1463,10 @@ namespace DbLinq.Vendor.Implementation
             return SqlStatement.Format("{0} LIMIT {1} OFFSET {2}", select, limit, offset);
         }
 
+        public virtual SqlStatement GetLiteralLimit (SqlStatement limitFields, SqlStatement select, SqlStatement limit, SqlStatement offset, SqlStatement offsetAndLimit) 
+        {
+            return GetLiteralLimit(select, limit, offset, offsetAndLimit);
+        }
         /// <summary>
         /// Gets the literal for a given string.
         /// </summary>

@@ -181,6 +181,8 @@ namespace DbLinq.Vendor
         /// <returns></returns>
         SqlStatement GetLiteralLimit(SqlStatement select, SqlStatement limit, SqlStatement offset, SqlStatement offsetAndLimit);
 
+        SqlStatement GetLiteralLimit (SqlStatement limitFields, SqlStatement literalSelect, SqlStatement literalLimit, SqlStatement literalOffset, SqlStatement literalOffsetAndLimit);
+
         /// <summary>
         /// Returns an ORDER criterium
         /// </summary>
@@ -316,5 +318,6 @@ namespace DbLinq.Vendor
         /// <param name="joins"></param>
         /// <returns></returns>
         SqlStatement GetJoinClauses(SqlStatement[] joins);
-    }
+
+      }
 }

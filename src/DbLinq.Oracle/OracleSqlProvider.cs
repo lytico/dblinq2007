@@ -95,11 +95,14 @@ namespace DbLinq.Oracle
                 select, limit, LimitedTableName, LimitedRownum, NewLine);
         }
 
+        public override SqlStatement GetLiteralLimit (SqlStatement limitFields, SqlStatement select, SqlStatement limit, SqlStatement offset, SqlStatement offsetAndLimit) {
+            return SqlStatement.Format(
+                @"SELECT {4} FROM ({3}{0}{3}) WHERE {2} > {1}",
+                GetLiteralLimit(select, offsetAndLimit), offset, LimitedRownum, NewLine, limitFields);
+        }
         public override SqlStatement GetLiteralLimit(SqlStatement select, SqlStatement limit, SqlStatement offset, SqlStatement offsetAndLimit)
         {
-            return SqlStatement.Format(
-                @"SELECT * FROM ({3}{0}{3}) WHERE {2} > {1}",
-                GetLiteralLimit(select, offsetAndLimit), offset, LimitedRownum, NewLine);
+            return GetLiteralLimit("*", select, limit, offset, offsetAndLimit);
         }
 
         protected override SqlStatement GetLiteralStringIndexOf(SqlStatement baseString, SqlStatement searchString, SqlStatement startIndex, SqlStatement count)

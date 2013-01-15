@@ -494,16 +494,21 @@ namespace DbLinq.Data.Linq.Sugar.Implementation
         {
             if (select.Limit != null)
             {
+                var sqlProvider = queryContext.DataContext.Vendor.SqlProvider;
                 var literalLimit = BuildExpression(select.Limit, queryContext);
                 if (select.Offset != null)
                 {
                     var literalOffset = BuildExpression(select.Offset, queryContext);
                     var literalOffsetAndLimit = BuildExpression(select.OffsetAndLimit, queryContext);
-                    return queryContext.DataContext.Vendor.SqlProvider.GetLiteralLimit(literalSelect, literalLimit,
+                    var limitFields = SqlStatement.Join(",",select.Operands.OfType<ColumnExpression>().Select(c => new SqlStatement(sqlProvider.GetColumn(c.Name))).ToList());
+                   
+                    return sqlProvider.GetLiteralLimit(
+                        limitFields,
+                        literalSelect, literalLimit,
                                                                                        literalOffset,
                                                                                        literalOffsetAndLimit);
                 }
-                return queryContext.DataContext.Vendor.SqlProvider.GetLiteralLimit(literalSelect, literalLimit);
+                return sqlProvider.GetLiteralLimit(literalSelect, literalLimit);
             }
             return literalSelect;
         }

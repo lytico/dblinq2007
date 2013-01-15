@@ -312,6 +312,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Util\TypeLoader.cs" />
+    <Compile Include="Util\UpsertBuilder.cs" />
     <Compile Include="Vendor\DbSchemaLoader.cs" />
     <Compile Include="Vendor\VendorAttribute.cs" />
     <Compile Include="Vendor\IDataTableColumn.cs" />
